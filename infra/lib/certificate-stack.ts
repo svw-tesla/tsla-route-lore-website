@@ -1,17 +1,19 @@
-import { Stack, StackProps, CfnOutput, Fn } from 'aws-cdk-lib';
+import { Stack, StackProps, CfnOutput } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 
 export interface CertificateStackProps extends StackProps {
   readonly zoneName: string;
+  /** Existing public hosted zone ID for zoneName — routelore.app already has
+   * one, auto-created by Route53Domains when the domain was registered. */
+  readonly hostedZoneId: string;
 }
 
 /**
- * Owns the routelore.app hosted zone and the CloudFront ACM certificate.
- * Must deploy to us-east-1 — CloudFront only accepts certs from that region.
- * The hosted zone itself is region-agnostic; it lives here so DNS validation
- * of the certificate doesn't require a cross-region reference back to it.
+ * Imports the existing routelore.app hosted zone and owns the CloudFront
+ * ACM certificate. Must deploy to us-east-1 — CloudFront only accepts certs
+ * from that region.
  */
 export class CertificateStack extends Stack {
   public readonly hostedZone: route53.IHostedZone;
@@ -20,7 +22,8 @@ export class CertificateStack extends Stack {
   constructor(scope: Construct, id: string, props: CertificateStackProps) {
     super(scope, id, props);
 
-    const zone = new route53.PublicHostedZone(this, 'Zone', {
+    const zone = route53.HostedZone.fromHostedZoneAttributes(this, 'Zone', {
+      hostedZoneId: props.hostedZoneId,
       zoneName: props.zoneName,
     });
     this.hostedZone = zone;
@@ -32,10 +35,6 @@ export class CertificateStack extends Stack {
     });
 
     new CfnOutput(this, 'HostedZoneId', { value: zone.hostedZoneId });
-    new CfnOutput(this, 'NameServers', {
-      value: Fn.join(',', zone.hostedZoneNameServers ?? []),
-      description: 'Delegate routelore.app at the registrar to these name servers',
-    });
     new CfnOutput(this, 'CertificateArn', { value: this.certificate.certificateArn });
   }
 }

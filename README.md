@@ -22,8 +22,9 @@ routelore.app / www.routelore.app
 Infra is CDK v2/TypeScript, two stacks (`infra/`):
 
 - `RouteLoreCertificateStack` (us-east-1 — CloudFront requires ACM certs
-  there) — owns the `routelore.app` Route 53 hosted zone and the ACM
-  certificate (DNS-validated, covers apex + `www`).
+  there) — imports the existing `routelore.app` Route 53 hosted zone
+  (auto-created by Route53Domains when the domain was registered) and owns
+  the ACM certificate (DNS-validated, covers apex + `www`).
 - `RouteLoreSiteStack` (us-east-2) — S3 bucket, CloudFront distribution,
   Route 53 A/AAAA alias records, and the GitHub OIDC deploy role. Consumes
   the zone and certificate from the cert stack via CDK cross-region stack
@@ -69,15 +70,19 @@ distribution are created by an operator-run `cdk deploy`, once:
 ```bash
 cd infra
 npm install
-AWS_PROFILE=tennis@charliesfarm npx cdk bootstrap aws://<account-id>/us-east-1
-AWS_PROFILE=tennis@charliesfarm npx cdk bootstrap aws://<account-id>/us-east-2
-AWS_PROFILE=tennis@charliesfarm npx cdk deploy --all
+AWS_PROFILE=tennis@gamename npx cdk bootstrap aws://657592885771/us-east-1
+AWS_PROFILE=tennis@gamename npx cdk bootstrap aws://657592885771/us-east-2
+AWS_PROFILE=tennis@gamename npx cdk deploy --all
 ```
 
-The hosted zone is created by this same deploy (`RouteLoreCertificateStack`).
-Its `NameServers` output must be delegated to at the domain's registrar
-before ACM DNS validation can complete — `cdk deploy` will sit waiting on
-certificate issuance until that delegation is live and has propagated.
+**AWS account: `tennis@gamename` (657592885771), not `tennis@charliesfarm`.**
+`routelore.app` was registered under Route53Domains in `gamename` (alongside
+`gatewitness.com`, `grangehand.*`, and other newer SVW domains) — the
+original brief assumed `charliesfarm` (the Mother Hen/C2DS account), which
+was wrong for this project. AWS auto-created hosted zone
+`Z057646936X4M5T8NMSDD` there when the domain was registered, already
+delegated correctly at the registrar; `RouteLoreCertificateStack` imports it
+rather than creating a new one.
 
 After the deploy, set the workflow's repo variables from the stack outputs:
 
