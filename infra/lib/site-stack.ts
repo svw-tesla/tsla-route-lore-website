@@ -12,7 +12,16 @@ export interface SiteStackProps extends StackProps {
   readonly zoneName: string;
   readonly hostedZone: route53.IHostedZone;
   readonly certificate: acm.ICertificate;
-  readonly githubOrgRepo: string; // e.g. "svw-tesla/tsla-route-lore-website"
+  /** OIDC token "sub" claim to trust, e.g.
+   * "repo:svw-tesla@306577278/tsla-route-lore-website@1305129692:ref:refs/heads/main".
+   * This enterprise (smith-varmint-works-llc) has GitHub's immutable-ID OIDC
+   * subject claims enabled, so the sub embeds numeric org/repo IDs
+   * (repo:<org>@<org_id>/<repo>@<repo_id>:ref:...) instead of the plain-name
+   * form most examples show — a plain-name StringLike condition never
+   * matches and AssumeRoleWithWebIdentity fails with an opaque "Not
+   * authorized" error. Confirm the exact string via a token debug step
+   * before changing this. */
+  readonly githubOidcSub: string;
 }
 
 /**
@@ -103,9 +112,7 @@ function handler(event) {
         {
           StringEquals: {
             'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
-          },
-          StringLike: {
-            'token.actions.githubusercontent.com:sub': `repo:${props.githubOrgRepo}:ref:refs/heads/main`,
+            'token.actions.githubusercontent.com:sub': props.githubOidcSub,
           },
         },
         'sts:AssumeRoleWithWebIdentity',
